@@ -7,7 +7,7 @@ class GeneticAlgorithm:
         self.population = [{"fitness":population[1],"moveset":population[0]} for population in population ]
         
         self.population_size = len(population)
-        self.mutation_rate = 0.02
+        self.mutation_rate = 0.05
         pass
 
     def fitness(self, agent,w1,w2,lawn_size):    
@@ -15,61 +15,94 @@ class GeneticAlgorithm:
         #print(agent[1])
         return agent["fitness"]
     
-        #Fitness is based on combination of lawn mowed and steps taken
-        #return w1 * (len(agent.mowed_cells) / (lawn_size**2)) + w2 * (1 / agent.steps_taken if agent.steps_taken != 0 else 0)
         
-
     #Ranks the agents of the population based on fitness
     #population: list of agents
     #agent: list of moves
     def evaluation(self):
+        self.total_fitness = 0
         ranked_population = self.population
         for agent in ranked_population:
             agent["fitness"] = self.fitness(agent=agent,w1=0,w2=0, lawn_size=10)
+            self.total_fitness += agent["fitness"]
         ranked_population.sort(reverse=True, key=lambda x: x["fitness"])
         return ranked_population
             
-            #ranked_population.append(agent)
-        #ranked_population.sort(reverse=True, key=lambda x: x[0])
-        #return ranked_population
+            
 
-    #Selects the best agents of the population for crossover (elitist tournament selection)
-    def selection(self, tournament_size, elite_size):
-        
-        if tournament_size > len(self.population) or elite_size > tournament_size:
-            raise ValueError("Invalid tournament size or elite size")
 
-        #Rank the population for tournament selection
-        #ranked_population = self.evaluation(self.population)
-        self.population = self.evaluation()
+    #=========SELECTION METHODS=========
 
-        #Create a tournament
-        tournament = random.sample(self.population, tournament_size)
+    def tournament_selection(self, population, tournament_size):
+        if len(population) < tournament_size:
+            raise ValueError("Tournament size is larger than the population size")
+
+        chosen_agents = []
         
-        #Sort the tournament
-        tournament.sort(reverse=True, key=lambda x: x["fitness"])
         
-        #Select elite individuals
-        elites = tournament[:elite_size]
-        print("ELITES: ",elites)
-        return elites
+        while len(chosen_agents) < 2:
+            
+            # Select a random sample of agents for the tournament
+            tournament = random.sample(population, tournament_size)
+            # Sort the tournament
+            tournament.sort(reverse=True, key=lambda x: x["fitness"])
+            chosen_agents.append(tournament[0])
+            """
+            agent1 = random.choice(tournament)
+            agent2 = random.choice(tournament)
+            if agent1["fitness"] > agent2["fitness"]:
+                chosen_agents.append(agent1)
+            else:
+                chosen_agents.append(agent2)
+            """
+        return chosen_agents
+        
+    def roulette_selection(self, population):
+        # Calculate the selection probabilities if they haven't been calculated yet this generation
+        #this helped improve performance instead of calculating it every time
+        if not hasattr(self, 'selection_probabilities'):
+            total_fitness = sum(agent["fitness"] for agent in population)
+            self.selection_probabilities = [agent["fitness"] / total_fitness for agent in population]
+            #print("SELECTION PROBABILITIES: ",self.selection_probabilities)
+         
+        chosen_agents = random.choices(population, weights=self.selection_probabilities, k=2)
+        
+        #chosen_agents = []
+       # while len(chosen_agents) < 2:
+        #    selected = random.choices(population, weights=selection_probabilities, k=1)[0]
+        #   if selected not in chosen_agents:
+        #        chosen_agents.append(selected)
+
+        return chosen_agents
+        
+
+    #Selects the best agents of the population using chosen selection method
+    def selection(self,selection_method):
+        
+        if selection_method=="tournament":
+            return self.tournament_selection(self.population, int(len(self.population)/20))
+        elif selection_method=="roulette":
+            return self.roulette_selection(self.population)
 
     #Crossover the selected agents using single or multi-point crossover
-    def crossover(self, parent1, parent2, crossover_point=3):
+    def crossover(self, agent1, agent2,crossover_method):
         # Check that the parents are lists of moves
         #if not isinstance(parent1, list) or not isinstance(parent2, list):
          #   raise ValueError("Parent is not a list of moves")
-        if len(parent1) < crossover_point or len(parent2) < crossover_point:
+        if len(agent1) != len(agent2):
             raise ValueError("One or both parents have fewer genes than the crossover point")
+        
+        parent1 = agent1[:]
+        parent2 = agent2[:]
         #Initialise offspring and parents
         offspring1 = []
         offspring2 = []
         #parent1 = []
         #parent2 = []
-
-        singlepoint = True
-        multipoint = False
-        if singlepoint:
+        crossover_methods = ["singlepoint",
+                             "multipoint"]
+        
+        if crossover_method == "singlepoint":
             # Choose a random crossover point
             crossover_point = random.randint(1, len(parent1) - 1)
 
@@ -79,66 +112,64 @@ class GeneticAlgorithm:
 
             return offspring1, offspring2
 
-        elif multipoint:        
-            #Loop through each gene in the parents
+        elif crossover_method == "multipoint":        
+            # Generate a set of unique random crossover points
+            #num_crossover_points = random.randint(1, len(parent1) - 1 // 2)
+            num_crossover_points = 5
+            crossover_points = set(random.randint(0, len(parent1) - 1) for _ in range(num_crossover_points))
+
+            # Loop through each gene in the parents
             for i in range(len(parent1)):
-                #If the crossover point is reached, swap the parents
-                #Works every crossover_point genes
-                if i % crossover_point == 0:
+                # If the current index is a crossover point, swap the parents
+                if i in crossover_points:
                     offspring1.append(parent2[i])
                     offspring2.append(parent1[i])
                 else:
                     offspring1.append(parent1[i])
                     offspring2.append(parent2[i])
 
-            print("PARENTS: ",parent1,parent2)
-            print("OFFSPRING: ",offspring1,offspring2)
+            if offspring1 == parent1 or offspring2 == parent2:
+                raise RuntimeError("No crossover")
+                
+
             return offspring1, offspring2
 
     def mutation(self,agent, mutation_rate):
         # Check that the agent is a list of moves
-        #agent = list(agent)
+        agent = agent[:]
         if not isinstance(agent, list):
             raise ValueError("Agent is not a list of moves")
-
-        
 
         #Loop through each gene in the agent
         for i in range(len(agent)):
             #If the mutation rate is reached, mutate the gene
-            if random.uniform(0,1) <= mutation_rate:
+            if random.random() < mutation_rate:
                 agent[i] = random.choice(range(4))
 
-        #agent = tuple(agent)
         return agent
     
     def evolve(self):
-        parents = []
-        # Select best agents for crossover
-        parents = self.selection(100, 5)
-        #Converts parents list to list of moves
-        # Remove the fitnesses from the parents
-        
-        parents = [parent['moveset'] for parent in parents]
+        next_generation_movesets = []
 
-        next_generation_movesets = parents[:]  # Copy the parents to the next generation
+        #Sort the population by fitness
+        self.population = self.evaluation()
 
-        # Crossover parents to create offspring
         while len(next_generation_movesets) < self.population_size:
-            # Select two random parents
-            parent1, parent2 = random.sample(parents,2)
+            
+            # Select best agents for crossover
+            parents = self.selection(selection_method="tournament")
+            
+            # Remove the fitnesses from the parents
+            parents = [parent['moveset'] for parent in parents]
 
             # Crossover the parents
-            offspring1, offspring2 = self.crossover(parent1, parent2)
+            offspring1, offspring2 = self.crossover(parents[0], parents[1], crossover_method="singlepoint")
 
             # Add the offspring to the next generation
-            
             next_generation_movesets.append(offspring1)
             if len(next_generation_movesets) < self.population_size:
                 next_generation_movesets.append(offspring2)
             
-            
-
         # If the new population is larger than the old population, remove the extra individuals
         if len(next_generation_movesets) > self.population_size:
             next_generation_movesets = next_generation_movesets[:self.population_size]
@@ -146,6 +177,11 @@ class GeneticAlgorithm:
         # Mutate the offspring
         for i in range(len(next_generation_movesets)):
             next_generation_movesets[i] = self.mutation(next_generation_movesets[i], self.mutation_rate)
+
+        # Delete the selection probabilities so they get recalculated for the next generation
+        # Helps improve performance so do not have to recalculate every call
+        if hasattr(self, 'selection_probabilities'):
+            del self.selection_probabilities
 
         
         # Update the population

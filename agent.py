@@ -1,60 +1,89 @@
 import random
+import time
+random.seed(time.time())
 
 
 class Agent:
-    def __init__(self, position, lawn_size):
+    
+    def __init__(self, position, lawn_size, genome_length):
+        self.genome_length = genome_length
         self.position = position
         self.previous_position = position
         self.lawn_size = lawn_size
+        self.individual = self.generate_moveset()
+
         self.fitness = 0
-        self.individual = []
+        self.mowed_cells_count = 0
+        self.steps_taken = 0
+        self.complete_rows, self.complete_columns = 0, 0
 
     def get_moveset(self):
         return self.individual
 
-    def move(self, position, firstGen, move_index=None):
+    def calculate_fitness(self, w1=0.8, w2=0.1, w3=0.1):
+        self.fitness = (w1 * (self.mowed_cells_count / (self.lawn_size**2)) + w2 * (self.complete_rows/self.lawn_size) + w3 * (self.complete_columns/self.lawn_size)) * 100
+        return self.fitness
+        
+    def move(self, position, move_index=None):
         # Define the directions the agent can move in
         directions = [(-1, 0),  # Up
                       (1, 0),   # Down
                       (0, -1),  # Left
                       (0, 1)]   # Right
 
+
         self.position = position
-
-        if not firstGen:
-            #print("SELF.INDIVIDUAL: ",self.individual)
-            if len(self.individual) > 0:
-
-                move = self.individual[move_index]
-                # Calculate the new position
-                new_position = ((self.position[0] + directions[move][0]) % self.lawn_size, 
-                                (self.position[1] + directions[move][1]) % self.lawn_size)
-                
-                # Update the agent's position
-                self.previous_position = self.position
-                self.position = new_position
-                
-                # Update position with new_position
-                position = new_position
-                
-                print("New position:", new_position)
-
-        else: 
-            # Choose a random direction
-            choice = random.choice(range(4))
-
-            # Calculate the new position
-            new_position = ((self.position[0] + directions[choice][0]) % self.lawn_size, 
-                            (self.position[1] + directions[choice][1]) % self.lawn_size)
-
-            # Update the position
-            self.previous_position = self.position
-            self.position = new_position
-            self.individual.append(choice)  # Update the individual attribute with the new move
-            
-            # Update position with new_position
+        self.positions = []
+        
+        move = self.individual[move_index]
+        # Calculate the new position
+        new_position = ((self.position[0] + directions[move][0]) % self.lawn_size, 
+                        (self.position[1] + directions[move][1]) % self.lawn_size)
+        
+        # Update the agent's position
+        self.previous_position = self.position
+        
+        self.position = new_position
+        
+        # Update position with new_position
             #self.position = new_position
             
+            #print("New position:", new_position)
+        #else:
+            # Choose a random direction
+            #for _ in range(20):
+            #choice = random.choice(range(4))
+            
+            # Calculate the new position
+            #new_position = ((self.position[0] + directions[choice][0]) % self.lawn_size, 
+             #               (self.position[1] + directions[choice][1]) % self.lawn_size)
+
+            # Update the position
+            #self.previous_position = self.position
+            #self.position = new_position
+            #self.positions.append(new_position)
+            #self.individual.append(choice)
+            # Update position with new_position
+            #self.position = new_position
+
+    def generate_moveset(self):
+        moveset=[]
+        for _ in range(self.genome_length):
+            choice = random.choice(range(4))
+            moveset.append(choice)
+        return moveset
+
+    def reset(self):
+        self.position = (0, 0)
+        self.previous_position = (0, 0)
+        self.mowed_cells_count = 0
+        self.positions = []
+        self.individual = []
+        
+
+
+
+
         """
         if not firstGen:
             #print(self.individual[0])
