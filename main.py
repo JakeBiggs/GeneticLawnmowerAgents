@@ -4,11 +4,11 @@ from agent import Agent
 from algorithm import GeneticAlgorithm
 global WINDOW_SIZE; WINDOW_SIZE = (800,600)
 
-#Genetic Algorithm Parameters
-global NUM_OF_GENERATIONS; NUM_OF_GENERATIONS = 1000
+#Genetic Algorithm Parameters (Default values)
+global NUM_OF_GENERATIONS; NUM_OF_GENERATIONS = 500
 global POPULATION_SIZE; POPULATION_SIZE = 100
 global STEPS_NUMBER; STEPS_NUMBER = 100
-global genome_length; genome_length = 10
+global chromosome_length; chromosome_length = 20
 global current_generation; current_generation = []
 global generation_metrics; generation_metrics = {}
 global all_generation_metrics; all_generation_metrics = []
@@ -20,8 +20,8 @@ def main_menu_state():
     # Define the window's contents
     layout = [
         [sg.VerticalSeparator(pad=((0,0),(0,100)))], 
-        [sg.Text("Genetic Programming: The Lawn Mower Problem", justification='center', size=(50,1), font=("Verdana", 20))],
-        [sg.Column([[sg.Image(filename="mowerpng.png")]], justification='center')],
+        [sg.Text("The Lawn Mower Problem", justification='center', size=(50,1), font=("Verdana", 20))],
+        [sg.Column([[sg.Image(filename="mainmenu.png")]], justification='center')],
         [sg.Column([[sg.Text("By Jacob Biggs", justification='center', size=(50,1), font=("Courier", 12))]], justification='center')],
         [sg.VerticalSeparator(pad=((0,0),(0,50)))],  # Add vertical space before buttons
         [sg.Column([[sg.Button('Start'), sg.Button('Quit')]], justification='center')]  # Center the buttons
@@ -77,7 +77,8 @@ def main_state():
 
     # Create the buttons
     buttons_row = [
-        sg.Button("Start", size=(10,1)), 
+        sg.Button("Start", size=(10,1)),
+        sg.Button("Pause/Resume", size=(10,1)), 
         sg.Button("Reset", size=(10,1)), 
         sg.Button('Quit', size=(10,1))
     ]
@@ -120,7 +121,9 @@ def main_state():
             window.close()
             return 'MAIN_MENU_STATE'
         elif event == 'leaderboard':
+           
             if not running:
+                window['Reset'].update(disabled=True)
                 #An agent has been selected from the leaderboard
                 leaderboard_index=  int(values['leaderboard'][0].split(" ")[1])-1
                 selected_agent = leaderboard_agents[leaderboard_index]
@@ -128,7 +131,7 @@ def main_state():
 
                 visited_cells = []
                 mowed_cells= []
-                for i in range(STEPS_NUMBER):
+                for i in range(100):
                     values = check_events(window)
                     selected_agent.move(selected_agent.position, move_index=i % len(selected_agent.individual))
                     if selected_agent.previous_position not in visited_cells:
@@ -157,150 +160,212 @@ def main_state():
                 window['mowed_cells_percent'].update(f"% Of Lawn Mowed:{mowed_cells_percentage}") #Update the text element
         
         elif event == 'Start':
-            running = True
-            agent_number = 1
-            window['agent_number'].update(f"Agent Number:{agent_number}")
-            agents = [Agent((0,0), lawn_size, genome_length=genome_length) for _ in range(POPULATION_SIZE)]
-            
-            window['generation_number'].update(f"Generation Number:{generation_number}")
+            options = show_options_menu()
 
-            #First generation
-            highest_average_fitness = 0
-            highest_best_fitness = 0
+            if options is not None:
 
-            for g in range(NUM_OF_GENERATIONS):
-                generation_number += 1
-                window['generation_number'].update(f"Generation Number:{generation_number}")
-                
-                for a in range(POPULATION_SIZE):
-                    visited_cells = []
-                    reset_lawn(window, lawn_size)
-                    step_number = 0
-                    window['step_number'].update(f"Step Number:{step_number}")
-                                    
-                    for i in range(STEPS_NUMBER):
-                        step_number += 1
-                        window['step_number'].update(f"Step Number:{step_number}")
-
-                        event, values = window.read(timeout=0)
-                        if event == "Reset":
-                            window.close()
-                            return 'MAIN_STATE'
-                        elif event == "Quit":
-                            window.close()
-                            return 'MAIN_MENU_STATE'
-                        elif event == "slider":
-                            window['slider'].update(values['slider'])
-                            window.refresh()
-
-                        agent = agents[a]                       
-                        if generation_number == 1 and len(agent.individual)==0: #and i % genome_length == 0:
-                            agent.individual = agent.generate_moveset()
-                        if len(agent.individual) > 0:
-                            agent.move(agent.position, move_index=i % len(agent.individual))
-
-                            if agent.previous_position not in visited_cells:
-                                window[agent.previous_position].update(button_color=('light green'))
-                                visited_cells.append(agent.previous_position)
-                            else:
-                                window[agent.previous_position].update(button_color=('light green'))  
-                            window[agent.position].update(button_color=('black'))
-                            window.refresh()
-
-                            if agent.position not in mowed_cells:
-                                mowed_cells.append(agent.position)
-                                mowed_cells_count += 1
-                                if mowed_cells_count == 100:
-                                    save_moveset_to_csv({'moveset': agent.individual}, 'leaderboard.csv', fieldnames=['moveset'])
-                                    remove_duplicates(filename="leaderboard.csv")
-                                    leaderboard_agents = load_agents_from_csv()
-                                    agent_strings = ["Solution " + str(i+1) for i in range(len(leaderboard_agents))]
-                                    window['leaderboard'].update(values=[agent_strings[i] for i in range(len(leaderboard_agents))])
-                                    print("Lawn Mowed, saving moveset to csv")
-                                    
-                                    #sg.popup("Lawn Mowed!")
-                                mowed_cells_percentage = (mowed_cells_count / (lawn_size**2)) * 100
-                                window['mowed_cells_percent'].update(f"% Of Lawn Mowed:{mowed_cells_percentage}")
-                                window.refresh()
-                        time.sleep(float(values['slider']))
-                     
-                    #=====MOVES HAVE BEEN MADE, EVALUATE THE AGENT'S FITNESS=====
-                    agent_number += 1
-
-                    agent.complete_rows, agent.complete_columns = count_rows_columns(mowed_cells, lawn_size)
-                    agent.mowed_cells_count = mowed_cells_count
-                    agent.calculate_fitness()
-
-                    current_generation.append((agent.individual, agent.fitness))
-                    window['agent_number'].update(f"Agent Number:{agent_number}")                  
-                    
-                    agent.position = (0,0)
-                    agent.previous_position = (0,0)
-                    window.refresh()
-                ### ==========GENERATION ENDS HERE=========== ###
-                
-                #Storing data from this generation before evoultion
-                fitness_scores= [current_generation[i][1] for i in range(len(current_generation))]
-                best_fitness= round(max(fitness_scores),2)
-                average_fitness= round(sum(fitness_scores)/len(fitness_scores),2)
-                #diversity= len(set(fitness_scores))
-
-                # Convert the movesets to strings and add them to a set
-                unique_movesets = set(str(current_generation[i][0]) for i in range(len(current_generation)))
-
-                # Calculate the diversity as the number of unique movesets
-                diversity = len(unique_movesets)
-
-                if average_fitness > highest_average_fitness:
-                    highest_average_fitness = average_fitness
-                if best_fitness > highest_best_fitness:
-                    highest_best_fitness = best_fitness
-                
-                # Update the model performance text
-                window['average_fitnesses'].update(f"Highest Average Fitness: {highest_average_fitness}, Last Generation Average Fitness: {average_fitness}")
-                window['best_fitnesses'].update(f"Highest Best Fitness: {highest_best_fitness}, Last Generation Best Fitness: {best_fitness}")
-                
-                #Store the metrics for the current generation
-                generation_metrics ={
-                    'generation_number': generation_number,
-                    'best_fitness': best_fitness,
-                    'average_fitness': average_fitness,
-                    'diversity': diversity,
-                    'individuals': [current_generation[i][0] for i in range(len(current_generation))]
-                }
-
-                fieldnames= ['generation_number', 'best_fitness', 'average_fitness', 'diversity', 'individuals']
-                if os.path.isfile('metrics.csv') == False:
-                    
-                    with open('metrics.csv', 'w') as csv_file:
-                        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                        writer.writeheader()
-                if os.path.isfile('metrics.csv') == True:
-                    with open('metrics.csv', 'a') as csv_file:
-                        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                        writer.writerow(generation_metrics)
-
-                #store the metrics for all generations
-                #all_generation_metrics.append(generation_metrics)
+                #Set options
+                NUM_OF_GENERATIONS = options['num_generations']
+                POPULATION_SIZE = options['population_size']
+                STEPS_NUMBER = 100
         
-                #Evolving the current generation
-                movesets = next_generation()
-                print("Generation", generation_number ,"evolving")                
-                #sg.popup("Next Generation")
+                chromosome_length = options['chromosome_length']
+                selection_method = options['selection_method']
+                crossover_method = options['crossover_method']
+                mutation_rate = options['mutation_rate']
+
+                running = True
+                window['Reset'].update(disabled=False)
+                agent_number = 1
+                window['agent_number'].update(f"Agent Number:{agent_number}")
+                agents = [Agent((0,0), lawn_size, chromosome_length=chromosome_length) for _ in range(POPULATION_SIZE)]
                 
-                #Reset all the agents
-                for i, agent in enumerate(agents):
-                    agent.individual = movesets[i]
-                    agent.position = (0,0)
-                    agent.previous_position = (0,0)
-                current_generation.clear()    
-                
+                window['generation_number'].update(f"Generation Number:{generation_number}")
+
+                #First generation
+                highest_average_fitness = 0
+                highest_best_fitness = 0
+
+                for g in range(NUM_OF_GENERATIONS):
+                    generation_number += 1
+                    window['generation_number'].update(f"Generation Number:{generation_number}")
+                    
+                    for a in range(POPULATION_SIZE):
+                        visited_cells = []
+                        reset_lawn(window, lawn_size)
+                        step_number = 0
+                        window['step_number'].update(f"Step Number:{step_number}")
+                        
+                        paused = False
+                        for i in range(STEPS_NUMBER):
+                            step_number += 1
+                            window['step_number'].update(f"Step Number:{step_number}")
+
+                            event, values = window.read(timeout=0)
+                            if event == "Pause/Resume":
+                                paused = not paused
+                            if event == "Reset":
+                                window.close()
+                                return 'MAIN_STATE'
+                            elif event == "Quit":
+                                window.close()
+                                return 'MAIN_MENU_STATE'
+                            elif event == "slider":
+                                window['slider'].update(values['slider'])
+                                window.refresh()
+
+                            while paused:
+                                event, values = window.read()
+                                if event == "Pause/Resume":
+                                    paused = not paused
+                                if event == "Reset":
+                                    window.close()
+                                    return 'MAIN_STATE'
+                                elif event == "Quit":
+                                    window.close()
+                                    return 'MAIN_MENU_STATE'
+
+                            agent = agents[a]                       
+                            if generation_number == 1 and len(agent.individual)==0: #and i % chromosome_length == 0:
+                                agent.individual = agent.generate_moveset()
+                            if len(agent.individual) > 0:
+                                agent.move(agent.position, move_index=i % len(agent.individual))
+                                
+                                if agent.previous_position not in visited_cells:
+                                    window[agent.previous_position].update(button_color=('light green'))
+                                    visited_cells.append(agent.previous_position)
+                                else:
+                                    window[agent.previous_position].update(button_color=('light green'))  
+                                window[agent.position].update(button_color=('black'))
+                                window.refresh()
+
+                                if agent.position not in mowed_cells:
+                                    mowed_cells.append(agent.position)
+                                    mowed_cells_count += 1
+                                    if mowed_cells_count == 100:
+                                        save_moveset_to_csv({'moveset': agent.individual}, 'leaderboard.csv', fieldnames=['moveset'])
+                                        remove_duplicates(filename="leaderboard.csv")
+                                        leaderboard_agents = load_agents_from_csv()
+                                        agent_strings = ["Solution " + str(i+1) for i in range(len(leaderboard_agents))]
+                                        window['leaderboard'].update(values=[agent_strings[i] for i in range(len(leaderboard_agents))])
+                                        print("Lawn Mowed, saving moveset to csv")
+                                        
+                                        #sg.popup("Lawn Mowed!")
+                                    mowed_cells_percentage = (mowed_cells_count / (lawn_size**2)) * 100
+                                    window['mowed_cells_percent'].update(f"% Of Lawn Mowed:{mowed_cells_percentage}")
+                                    window.refresh()
+                            time.sleep(float(values['slider']))
+                        
+                        #=====MOVES HAVE BEEN MADE, EVALUATE THE AGENT'S FITNESS=====
+                        agent_number += 1
+
+                        agent.complete_rows, agent.complete_columns = count_rows_columns(mowed_cells, lawn_size)
+                        agent.mowed_cells_count = mowed_cells_count
+                        agent.calculate_fitness()
+
+                        current_generation.append((agent.individual, agent.fitness))
+                        window['agent_number'].update(f"Agent Number:{agent_number}")                  
+                        
+                        agent.position = (0,0)
+                        agent.previous_position = (0,0)
+                        window.refresh()
+                    ### ==========GENERATION ENDS HERE=========== ###
+                    
+                    #Storing data from this generation before evoultion
+                    fitness_scores= [current_generation[i][1] for i in range(len(current_generation))]
+                    best_fitness= round(max(fitness_scores),2)
+                    average_fitness= round(sum(fitness_scores)/len(fitness_scores),2)
+                    #diversity= len(set(fitness_scores))
+
+                    # Convert the movesets to strings and add them to a set
+                    unique_movesets = set(str(current_generation[i][0]) for i in range(len(current_generation)))
+
+                    # Calculate the diversity as the number of unique movesets
+                    diversity = len(unique_movesets)
+
+                    if average_fitness > highest_average_fitness:
+                        highest_average_fitness = average_fitness
+                    if best_fitness > highest_best_fitness:
+                        highest_best_fitness = best_fitness
+                    
+                    # Update the model performance text
+                    window['average_fitnesses'].update(f"Highest Average Fitness: {highest_average_fitness}, Last Generation Average Fitness: {average_fitness}")
+                    window['best_fitnesses'].update(f"Highest Best Fitness: {highest_best_fitness}, Last Generation Best Fitness: {best_fitness}")
+                    
+                    #Store the metrics for the current generation
+                    generation_metrics ={
+                        'generation_number': generation_number,
+                        'best_fitness': best_fitness,
+                        'average_fitness': average_fitness,
+                        'diversity': diversity,
+                        'individuals': [current_generation[i][0] for i in range(len(current_generation))]
+                    }
+
+                    fieldnames= ['generation_number', 'best_fitness', 'average_fitness', 'diversity', 'individuals']
+                    if os.path.isfile('metrics.csv') == False:
+                        
+                        with open('metrics.csv', 'w') as csv_file:
+                            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                            writer.writeheader()
+                    if os.path.isfile('metrics.csv') == True:
+                        with open('metrics.csv', 'a') as csv_file:
+                            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                            writer.writerow(generation_metrics)
+
+                    #store the metrics for all generations
+                    #all_generation_metrics.append(generation_metrics)
+            
+                    #Evolving the current generation
+                    movesets = next_generation(selection=selection_method, crossover=crossover_method, mutation_rate=mutation_rate)
+                    print("Generation", generation_number ,"evolving")                
+                    #sg.popup("Next Generation")
+                    
+                    #Reset all the agents
+                    for i, agent in enumerate(agents):
+                        agent.individual = movesets[i]
+                        agent.position = (0,0)
+                        agent.previous_position = (0,0)
+                    current_generation.clear()    
+            #ENDIF OPTIONS IS NOT NONE        
         elif event == "Reset":
             reset_lawn(window, lawn_size)
             return 'MAIN_STATE'   
 def quit_state():
     exit()
-    
+
+def show_options_menu():
+    options_layout = [
+        [sg.Text('Chromosome Length:'), sg.Input(default_text='10', key='chromosome_length')],
+        [sg.Text('Crossover Method:'), sg.Combo(['Singlepoint', 'Multipoint'], default_value='Singlepoint', key='crossover_method')],
+        [sg.Text('Selection Method:'), sg.Combo(['Roulette', 'Tournament'], default_value='Tournament', key='selection_method')],
+        [sg.Text('Mutation Rate:'), sg.Slider(size=(30,10),range=(0, 1), resolution=0.01, default_value=0.05, orientation='horizontal', key='mutation_rate')],
+        [sg.Text('Agents Per Generation:'), sg.Input(default_text='100', key='population_size')],
+        [sg.Text('Number of Generations:'), sg.Input(default_text='100', key='num_generations')],
+        [sg.Button('Start Simulation'), sg.Button('Cancel')]
+    ]
+     
+    options_window = sg.Window('Options', options_layout)
+
+    while True:
+        event, values = options_window.read()
+
+        if event == sg.WINDOW_CLOSED or event == 'Cancel':
+            options_window.close()
+            return None
+        elif event == 'Start Simulation':
+            options_window.close()
+            
+            return {
+                'chromosome_length': int(values['chromosome_length']),
+                'crossover_method': values['crossover_method'],
+                'selection_method': values['selection_method'],
+                'mutation_rate': float(values['mutation_rate']),
+                'population_size': int(values['population_size']),
+                'num_generations': int(values['num_generations'])
+            }
+
+
+
 #==============HELPER FUNCTIONS=================#
 
 def check_events(window):
@@ -315,6 +380,10 @@ def check_events(window):
         window['slider'].update(values['slider'])
         window.refresh()
     return values
+
+def next_generation(selection, crossover, mutation_rate):
+    ga = GeneticAlgorithm(current_generation)
+    return ga.evolve(selection_method=selection, crossover_method=crossover, mutation_rate=mutation_rate)
 
 def count_rows_columns(mowed_cells, lawn_size):
     mowed_cells_set = (set(mowed_cells)) #Removes duplicates
@@ -336,10 +405,7 @@ def reset_lawn(window, lawn_size):
     window['mowed_cells_percent'].update(f"% Of Lawn Mowed:{mowed_cells_percentage}")
     window.refresh()
 
-def next_generation():
-    ga = GeneticAlgorithm(current_generation)
-    #current_generation.clear()
-    return ga.evolve()
+
 
 def save_moveset_to_csv(content, filename, fieldnames=None):
     content['moveset'] = ','.join(map(str, content['moveset']))
@@ -358,7 +424,7 @@ def load_agents_from_csv(filename='leaderboard.csv'):
         with open(filename, 'r') as csv_file:
             reader = csv.DictReader(csv_file)
             for row in reader:
-                agent = Agent((0,0), lawn_size=10, genome_length=len(row['moveset']))
+                agent = Agent((0,0), lawn_size=10, chromosome_length=len(row['moveset']))
                 moveset_str = row['moveset'].strip("[]")
                 agent.individual = list(map(int,row['moveset'].strip('[]').split(',')))
                 agents.append(agent)

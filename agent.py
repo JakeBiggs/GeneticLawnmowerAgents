@@ -5,8 +5,8 @@ random.seed(time.time())
 
 class Agent:
     
-    def __init__(self, position, lawn_size, genome_length):
-        self.genome_length = genome_length
+    def __init__(self, position, lawn_size, chromosome_length):
+        self.chromosome_length = chromosome_length
         self.position = position
         self.previous_position = position
         self.lawn_size = lawn_size
@@ -44,31 +44,10 @@ class Agent:
         self.previous_position = self.position
         
         self.position = new_position
-        
-        # Update position with new_position
-            #self.position = new_position
-            
-            #print("New position:", new_position)
-        #else:
-            # Choose a random direction
-            #for _ in range(20):
-            #choice = random.choice(range(4))
-            
-            # Calculate the new position
-            #new_position = ((self.position[0] + directions[choice][0]) % self.lawn_size, 
-             #               (self.position[1] + directions[choice][1]) % self.lawn_size)
-
-            # Update the position
-            #self.previous_position = self.position
-            #self.position = new_position
-            #self.positions.append(new_position)
-            #self.individual.append(choice)
-            # Update position with new_position
-            #self.position = new_position
 
     def generate_moveset(self):
         moveset=[]
-        for _ in range(self.genome_length):
+        for _ in range(self.chromosome_length):
             choice = random.choice(range(4))
             moveset.append(choice)
         return moveset
