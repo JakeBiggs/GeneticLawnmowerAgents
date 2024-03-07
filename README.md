@@ -1,5 +1,5 @@
 # COMP213-2207976
-A Genetic Programming Approach to the Lawn Mower Problem
+A Genetic Algorithm Approach to the Lawn Mower Problem
 
 
 # Install Guide
